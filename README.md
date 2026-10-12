@@ -139,3 +139,7 @@ python test_phase4.py   # Kiểm thử Quản lý Thiết bị & Mượn kèm (1
 
 ## 📄 Bản quyền & Đóng góp
 Dự án được phát triển bởi Nhóm 4 — Khoa Công nghệ Thông tin, Đại học CNTT & Truyền thông (ICTU).
+
+## Quy trình làm việc nhóm
+
+Xem [CONTRIBUTING.md](CONTRIBUTING.md) để làm việc theo luồng feature → develop → main. Trưởng nhóm: @imthoai2k4.
