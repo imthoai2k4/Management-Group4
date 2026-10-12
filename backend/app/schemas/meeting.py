@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+from app.services.meeting_time import local_meeting_time
 from typing import Optional, List
 from datetime import datetime
 
@@ -16,7 +17,14 @@ class MeetingParticipantOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class MeetingCreate(BaseModel):
+class MeetingTimeInput(BaseModel):
+    @field_validator("start_time", "end_time", check_fields=False)
+    @classmethod
+    def normalize_time(cls, value):
+        return local_meeting_time(value) if value is not None else None
+
+
+class MeetingCreate(MeetingTimeInput):
     room_id: int
     title: str
     description: Optional[str] = None
@@ -28,7 +36,7 @@ class MeetingCreate(BaseModel):
     participant_ids: Optional[List[int]] = []
     equipment_ids: Optional[List[int]] = []
 
-class MeetingUpdate(BaseModel):
+class MeetingUpdate(MeetingTimeInput):
     room_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
@@ -43,8 +51,14 @@ class MeetingUpdate(BaseModel):
 class MeetingRespond(BaseModel):
     status: str # ACCEPTED or DECLINED
 
+class MeetingApprovalRequest(BaseModel):
+    note: Optional[str] = None
+
+class MeetingRejectRequest(BaseModel):
+    reason: Optional[str] = None
+
 class MeetingStatusUpdate(BaseModel):
-    status: str # IN_PROGRESS, COMPLETED, CANCELLED
+    status: str # PENDING, SCHEDULED, APPROVED, IN_PROGRESS, COMPLETED, CANCELLED, REJECTED
 
 class MeetingOut(BaseModel):
     meeting_id: int

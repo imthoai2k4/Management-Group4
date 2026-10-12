@@ -7,45 +7,56 @@ import {
 } from 'lucide-react';
 import ChatbotWidget from './ChatbotWidget';
 import { NotificationDropdown } from './NotificationDropdown';
+import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const activePath = location.pathname;
-  const { user: userProfile } = useAuth();
+  const { user: userProfile, logout } = useAuth();
 
   const [showNotif, setShowNotif] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Yêu cầu phòng Lab 3', time: '5 phút trước' },
-    { id: 2, title: 'Cập nhật hệ thống', time: '1 giờ trước' },
-    { id: 3, title: 'Báo cáo tháng', time: '2 giờ trước' }
-  ]);
+  const { unreadCount } = useNotifications();
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('meetinghub_token');
-    sessionStorage.removeItem('meetinghub_user');
-    setShowUserDropdown(false);
-    window.location.href = '/login';
-  };
+  const handleLogout = logout;
 
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
-  const updatePendingCount = () => {
+  const updatePendingCount = async () => {
+    let count = 0;
     try {
+      // 1. Fetch live from backend APIs
+      const [meetingsRes, eqRes] = await Promise.allSettled([
+        api.get('/meetings?status=PENDING'),
+        api.get('/equipment-requests?status=PENDING')
+      ]);
+
+      if (meetingsRes.status === 'fulfilled' && Array.isArray(meetingsRes.value?.data)) {
+        count += meetingsRes.value.data.filter((m: any) => m.status === 'PENDING').length;
+      }
+      if (eqRes.status === 'fulfilled' && Array.isArray(eqRes.value?.data)) {
+        count += eqRes.value.data.filter((e: any) => e.status === 'PENDING').length;
+      }
+
+      // 2. Include any non-numeric/mock items from localStorage
       const saved = localStorage.getItem('meetinghub_room_requests');
       if (saved) {
-        const requests = JSON.parse(saved);
-        const count = requests.filter((r: any) => r.status === 'Chờ duyệt' || r.status === 'pending').length;
-        setPendingRequestsCount(count);
-      } else {
-        setPendingRequestsCount(0);
+        try {
+          const requests = JSON.parse(saved);
+          const localOnly = requests.filter((r: any) => 
+            (r.status === 'Chờ duyệt' || r.status === 'pending') &&
+            typeof r.id === 'string' && !/^\d+$/.test(r.id)
+          ).length;
+          count += localOnly;
+        } catch (e) {}
       }
+
+      setPendingRequestsCount(count);
     } catch (e) {
-      console.error(e);
+      console.error("Lỗi cập nhật badge chờ duyệt:", e);
     }
   };
 
@@ -254,7 +265,8 @@ export default function MainLayout() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
 
               {/* 1. QUẢ CHUÔNG THÔNG BÁO */}
-              <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowNotif(!showNotif)}>
+              <div style={{ position: 'relative' }}>
+                <button aria-label={`Thông báo, ${unreadCount} chưa đọc`} aria-expanded={showNotif} onClick={() => setShowNotif(!showNotif)} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -276,8 +288,9 @@ export default function MainLayout() {
                   justifyContent: 'center',
                   border: '2px solid #1b1c3a'
                 }}>
-                  {notifications.length}
+                  {unreadCount}
                 </span>
+                </button>
                 {/* Dropdown Thông báo */}
                 {showNotif && (
                   <NotificationDropdown onClose={() => setShowNotif(false)} />
